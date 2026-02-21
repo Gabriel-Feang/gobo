@@ -9,7 +9,7 @@ import (
 )
 
 func TestGobo_Passthrough(t *testing.T) {
-	g := New(Config{Debug: false})
+	g := New()
 
 	nextHandlerCalled := false
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -39,7 +39,7 @@ func TestGobo_Passthrough(t *testing.T) {
 }
 
 func TestGobo_Match(t *testing.T) {
-	g := New(Config{Debug: false})
+	g := New()
 	g.Register("POST", "/users", map[string]string{"result": "success"})
 
 	req1 := httptest.NewRequest("POST", "/users", nil)

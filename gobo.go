@@ -28,6 +28,48 @@ type Config struct {
 	Debug bool
 }
 
+// Option is a functional option for configuring a Gobo instance.
+type Option func(*Gobo)
+
+// WithConfig applies a full Config struct (backward-compatible with the old API).
+func WithConfig(cfg Config) Option {
+	return func(g *Gobo) {
+		g.config = cfg
+		if cfg.Generator != nil {
+			g.client = cfg.Generator
+		} else {
+			if cfg.OllamaURL == "" {
+				cfg.OllamaURL = "http://localhost:11434"
+			}
+			g.client = NewOllamaGenerator(cfg.OllamaURL, cfg.Model)
+		}
+	}
+}
+
+// WithOllama configures Gobo to use a local Ollama instance.
+func WithOllama(url, model string) Option {
+	return func(g *Gobo) {
+		g.config.OllamaURL = url
+		g.config.Model = model
+		g.client = NewOllamaGenerator(url, model)
+	}
+}
+
+// WithDebug enables verbose logging.
+func WithDebug() Option {
+	return func(g *Gobo) {
+		g.config.Debug = true
+	}
+}
+
+// WithGenerator sets a custom Generator implementation.
+func WithGenerator(gen Generator) Option {
+	return func(g *Gobo) {
+		g.config.Generator = gen
+		g.client = gen
+	}
+}
+
 // Gobo is the core struct that holds the configuration and registered schemas.
 type Gobo struct {
 	config Config
@@ -42,23 +84,24 @@ type routeSchema struct {
 	ResponseSchema any    // raw Go struct to be marshaled into a JSON schema
 }
 
-// New creates a new Gobo instance.
-func New(cfg Config) *Gobo {
-	var gen Generator
-	if cfg.Generator != nil {
-		gen = cfg.Generator
-	} else {
-		if cfg.OllamaURL == "" {
-			cfg.OllamaURL = "http://localhost:11434"
-		}
-		gen = NewOllamaGenerator(cfg.OllamaURL, cfg.Model)
+// New creates a new Gobo instance with functional options.
+func New(opts ...Option) *Gobo {
+	g := &Gobo{
+		routes: make([]*routeSchema, 0),
 	}
 
-	return &Gobo{
-		config: cfg,
-		routes: make([]*routeSchema, 0),
-		client: gen,
+	for _, opt := range opts {
+		opt(g)
 	}
+
+	return g
+}
+
+// SetGenerator replaces the current generator. This is used by external
+// packages (like gobo/mcp) that need to wire in a generator after construction.
+func (g *Gobo) SetGenerator(gen Generator) {
+	g.config.Generator = gen
+	g.client = gen
 }
 
 // logf logs messages if Debug is enabled.
@@ -68,13 +111,12 @@ func (g *Gobo) logf(format string, args ...any) {
 	}
 }
 
-// Middleware returns a standard net/http middleware.
+// Middleware returns a standard net/http middleware that intercepts requests
+// matching registered schemas via Register(). Unmatched routes pass through.
 func (g *Gobo) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Attempt to match the request to a registered schema
 		schema := g.match(r)
 
-		// If no schema is registered for this route, fallback to the next handler
 		if schema == nil {
 			g.logf("No schema matched for %s %s. Passing to next handler.", r.Method, r.URL.Path)
 			next.ServeHTTP(w, r)
@@ -82,22 +124,7 @@ func (g *Gobo) Middleware(next http.Handler) http.Handler {
 		}
 
 		g.logf("Intercepted %s %s (matched %s)", r.Method, r.URL.Path, schema.PathPrefix)
-
-		// 1. Extract context from the incoming request (headers, query, body)
-		reqContext := extractRequestContext(r)
-
-		// 2. Query the LLM for a mocked response fitting the schema and request context
-		responseBytes, err := g.client.GenerateResponse(r.Context(), reqContext, schema.ResponseSchema)
-		if err != nil {
-			g.logf("Error generating LLM response: %v", err)
-			http.Error(w, "Gobo Mock Generation Failed: "+err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		// 3. Write back the LLM generated JSON
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write(responseBytes)
+		g.generateAndWrite(w, r, schema.ResponseSchema)
 	})
 }
 

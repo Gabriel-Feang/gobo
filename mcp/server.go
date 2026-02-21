@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"log"
 
 	"github.com/gabriel-feang/gobo"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -30,6 +31,26 @@ func NewServer(broker *gobo.AsyncBroker) *Server {
 func (s *Server) Start(ctx context.Context) error {
 	transport := &mcp.StdioTransport{}
 	return s.mcp.Run(ctx, transport)
+}
+
+// WithMCP returns a gobo.Option that wires up an AsyncBroker and starts
+// the MCP server on stdio in a background goroutine. This is the simplest
+// way to get Gobo + MCP running:
+//
+//	g := gobo.New(gobomcp.WithMCP())
+func WithMCP() gobo.Option {
+	return func(g *gobo.Gobo) {
+		broker := gobo.NewAsyncBroker()
+		g.SetGenerator(broker)
+
+		srv := NewServer(broker)
+		go func() {
+			log.Println("[gobo-mcp] MCP server starting on stdio")
+			if err := srv.Start(context.Background()); err != nil {
+				log.Printf("[gobo-mcp] MCP server error: %v", err)
+			}
+		}()
+	}
 }
 
 type GetPendingRequestsInput struct{}

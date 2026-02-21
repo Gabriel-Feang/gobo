@@ -16,10 +16,7 @@ func TestOrderService_WithGoboMock(t *testing.T) {
 	// In a real project, you would wire a real Generator (like Ollama or OpenAI) to power it!
 	broker := gobo.NewAsyncBroker()
 
-	mock := gobo.New(gobo.Config{
-		Generator: broker,
-		Debug:     true,
-	})
+	mock := gobo.New(gobo.WithGenerator(broker), gobo.WithDebug())
 
 	// 2. Define the schema we expect the mocked payment gateway to return
 	type ExpectedGatewayResponse struct {

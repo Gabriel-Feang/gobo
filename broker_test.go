@@ -11,10 +11,7 @@ import (
 func TestAsyncBroker_Blocking(t *testing.T) {
 	broker := NewAsyncBroker()
 
-	g := New(Config{
-		Generator: broker,
-		Debug:     true,
-	})
+	g := New(WithGenerator(broker), WithDebug())
 	g.Register("GET", "/async", map[string]string{"foo": "bar"})
 
 	// We simulate the HTTP server by calling match and GenerateResponse in a goroutine

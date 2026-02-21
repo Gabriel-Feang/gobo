@@ -18,10 +18,7 @@ func (m *mockGenerator) GenerateResponse(ctx context.Context, reqCtx RequestCont
 func TestCustomGenerator(t *testing.T) {
 	expectedJSON := `{"id":"123","username":"testuser"}`
 
-	g := New(Config{
-		Generator: &mockGenerator{Response: []byte(expectedJSON)},
-		Debug:     true,
-	})
+	g := New(WithGenerator(&mockGenerator{Response: []byte(expectedJSON)}), WithDebug())
 
 	g.Register("GET", "/users", map[string]string{})
 

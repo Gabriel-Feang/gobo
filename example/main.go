@@ -17,13 +17,11 @@ type UserResponse struct {
 }
 
 func main() {
-	// Initialize Gobo with default settings
-	// Assuming local Ollama instance running llama3
-	mock := gobo.New(gobo.Config{
-		OllamaURL: "http://localhost:11434",
-		Model:     "llama3",
-		Debug:     true,
-	})
+	// Initialize Gobo with a local Ollama instance
+	mock := gobo.New(
+		gobo.WithOllama("http://localhost:11434", "llama3"),
+		gobo.WithDebug(),
+	)
 
 	// Register a mock schema for GET /users
 	mock.Register("GET", "/users/", UserResponse{})

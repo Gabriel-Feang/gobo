@@ -6,8 +6,8 @@ import (
 	"net/http/httptest"
 	"os"
 
-	"github.com/feang/gobo"
-	"github.com/feang/gobo/mcp"
+	"github.com/gabriel-feang/gobo"
+	"github.com/gabriel-feang/gobo/mcp"
 )
 
 // To try this MCP Server:

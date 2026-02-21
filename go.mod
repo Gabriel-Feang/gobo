@@ -1,4 +1,4 @@
-module github.com/feang/gobo
+module github.com/gabriel-feang/gobo
 
 go 1.25.6
 

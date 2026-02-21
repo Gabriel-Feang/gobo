@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/feang/gobo"
+	"github.com/gabriel-feang/gobo"
 )
 
 func TestOrderService_WithGoboMock(t *testing.T) {

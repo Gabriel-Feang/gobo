@@ -16,7 +16,7 @@ Instead of writing verbose test files and mocking functions, you can start the t
 ## Installation
 
 ```bash
-go get github.com/feang/gobo
+go get github.com/gabriel-feang/gobo
 ```
 
 ## Quick Start (Ollama LLM)
@@ -30,7 +30,7 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
-	"github.com/feang/gobo"
+	"github.com/gabriel-feang/gobo"
 )
 
 // 1. Define the schema of the downstream API you want to mock

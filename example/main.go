@@ -5,7 +5,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/feang/gobo"
+	"github.com/gabriel-feang/gobo"
 )
 
 // UserResponse is the schema we expect the mock to generate

@@ -27,9 +27,9 @@ func NewServer(broker *gobo.AsyncBroker) *Server {
 }
 
 // Start begins serving MCP requests over stdio. This method blocks indefinitely.
-func (s *Server) Start() error {
+func (s *Server) Start(ctx context.Context) error {
 	transport := &mcp.StdioTransport{}
-	return s.mcp.Run(context.Background(), transport)
+	return s.mcp.Run(ctx, transport)
 }
 
 type GetPendingRequestsInput struct{}

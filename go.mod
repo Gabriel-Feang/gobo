@@ -1,3 +1,5 @@
 module github.com/feang/gobo
 
 go 1.25.6
+
+require github.com/google/uuid v1.6.0

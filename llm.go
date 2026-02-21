@@ -11,16 +11,18 @@ import (
 	"time"
 )
 
-// llmClient interacts with the configured Ollama instance.
-type llmClient struct {
-	config     Config
+// OllamaGenerator interacts with the configured Ollama instance.
+type OllamaGenerator struct {
+	url        string
+	model      string
 	httpClient *http.Client
 }
 
-// newLLMClient initializes a new client.
-func newLLMClient(cfg Config) *llmClient {
-	return &llmClient{
-		config: cfg,
+// NewOllamaGenerator initializes a new client for a local Ollama instance.
+func NewOllamaGenerator(url string, model string) *OllamaGenerator {
+	return &OllamaGenerator{
+		url:   url,
+		model: model,
 		httpClient: &http.Client{
 			// Give the LLM enough time to generate a response
 			Timeout: 2 * time.Minute,
@@ -29,14 +31,14 @@ func newLLMClient(cfg Config) *llmClient {
 }
 
 // GenerateResponse queries the LLM and attempts to parse its output back as JSON matching the schema.
-func (c *llmClient) GenerateResponse(ctx context.Context, reqCtx RequestContext, schema any) ([]byte, error) {
+func (c *OllamaGenerator) GenerateResponse(ctx context.Context, reqCtx RequestContext, schema any) ([]byte, error) {
 	prompt, err := c.buildPrompt(reqCtx, schema)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build prompt: %w", err)
 	}
 
 	ollamaReq := map[string]any{
-		"model":  c.config.Model,
+		"model":  c.model,
 		"prompt": prompt,
 		// Force JSON mode in Ollama
 		"format": "json",
@@ -51,7 +53,7 @@ func (c *llmClient) GenerateResponse(ctx context.Context, reqCtx RequestContext,
 		return nil, fmt.Errorf("failed to marshal ollama request: %w", err)
 	}
 
-	endpoint := strings.TrimRight(c.config.OllamaURL, "/") + "/api/generate"
+	endpoint := strings.TrimRight(c.url, "/") + "/api/generate"
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(reqBody))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -86,7 +88,7 @@ func (c *llmClient) GenerateResponse(ctx context.Context, reqCtx RequestContext,
 }
 
 // buildPrompt constructs the prompt containing the HTTP request details and the required JSON schema.
-func (c *llmClient) buildPrompt(reqCtx RequestContext, schema any) (string, error) {
+func (c *OllamaGenerator) buildPrompt(reqCtx RequestContext, schema any) (string, error) {
 	schemaBytes, err := json.MarshalIndent(schema, "", "  ")
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal schema: %w", err)

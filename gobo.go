@@ -2,17 +2,28 @@ package gobo
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"log"
 	"net/http"
 )
 
+// Generator defines the interface for an AI model that can generate fake data from a schema.
+type Generator interface {
+	GenerateResponse(ctx context.Context, reqCtx RequestContext, schema any) ([]byte, error)
+}
+
 // Config represents the configuration for the Gobo middleware.
 type Config struct {
 	// OllamaURL is the base address of the Ollama server (e.g., "http://localhost:11434").
+	// Used only if Generator is nil.
 	OllamaURL string
 	// Model is the name of the LLM model to use (e.g., "llama3" or "mistral").
+	// Used only if Generator is nil.
 	Model string
+	// Generator allows providing a custom LLM integration (e.g. OpenAI, Anthropic, MCP).
+	// If nil, Gobo defaults to the built-in OllamaGenerator using OllamaURL and Model.
+	Generator Generator
 	// Debug enables verbose logging if set to true.
 	Debug bool
 }
@@ -21,7 +32,7 @@ type Config struct {
 type Gobo struct {
 	config Config
 	routes []*routeSchema
-	client *llmClient
+	client Generator
 }
 
 // routeSchema stores an expected schema for a specific HTTP method and path pattern.
@@ -33,13 +44,20 @@ type routeSchema struct {
 
 // New creates a new Gobo instance.
 func New(cfg Config) *Gobo {
-	if cfg.OllamaURL == "" {
-		cfg.OllamaURL = "http://localhost:11434"
+	var gen Generator
+	if cfg.Generator != nil {
+		gen = cfg.Generator
+	} else {
+		if cfg.OllamaURL == "" {
+			cfg.OllamaURL = "http://localhost:11434"
+		}
+		gen = NewOllamaGenerator(cfg.OllamaURL, cfg.Model)
 	}
+
 	return &Gobo{
 		config: cfg,
 		routes: make([]*routeSchema, 0),
-		client: newLLMClient(cfg),
+		client: gen,
 	}
 }
 

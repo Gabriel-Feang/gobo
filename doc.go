@@ -1,55 +1,63 @@
 /*
-Package gobo provides an AI-powered HTTP middleware for simulating downstream services
-in integration tests.
+Package gobo intercepts HTTP requests and generates intelligent mock responses
+using AI, so you never have to hard-code JSON stubs again.
 
-Instead of meticulously hard-coding JSON stubs for every edge case in your tests,
-you can use Gobo to define an expected struct schema for a given route. Gobo intercepts
-the network call, sends the request's context and your schema to a local LLM
-(like Ollama), and seamlessly unmarshals the realistic AI-generated JSON back to
-your application.
+# Quick Start
 
-# Key Features
+Add one line to main() and wrap your routes:
 
-  - Schema-driven mocking: Register routes with expected response schemas.
-  - Dynamic Prompt Engineering: Use the `gobo` struct tag to provide explicit
-    instructions to the LLM for specific fields.
-  - Extensible: Provide your own `Generator` implementation to use OpenAI, Anthropic,
-    or other AI models instead of the default local Ollama instance.
-  - AsyncBroker: A specialized `Generator` that allows MCP-connected test agents
-    to manually fulfill intercepted requests asynchronously without tripping HTTP timeouts.
+	import (
+	    "net/http"
+	    "github.com/gabriel-feang/gobo"
+	    _ "github.com/gabriel-feang/gobo/mcp" // auto-registers MCP server
+	)
 
-# Basic Usage
-
-	mock := gobo.New(gobo.Config{
-		OllamaURL: "http://localhost:11434",
-		Model:     "llama3",
-	})
-
-	type PaymentResponse struct {
-		TransactionID string `json:"transaction_id" gobo:"A valid UUID v4"`
-		Status        string `json:"status" gobo:"Must always be 'APPROVED'"`
+	type UserResponse struct {
+	    ID    string `json:"id" gobo:"A UUID v4"`
+	    Name  string `json:"name" gobo:"A creative internet handle"`
+	    Email string `json:"email" gobo:"A valid email for a tech company"`
 	}
 
-	mock.Register("POST", "/v1/charge", PaymentResponse{})
+	func main() {
+	    gobo.Start()  // only active when GOBO=1 env var is set
 
-	// Wrap your standard mux or test server
-	ts := httptest.NewServer(mock.Middleware(http.NewServeMux()))
-	defer ts.Close()
+	    mux := http.NewServeMux()
+	    mux.Handle("GET /users", gobo.Intercept(realUsersHandler, UserResponse{}))
+	    mux.Handle("GET /health", gobo.Stub(HealthResponse{Status: "ok"}))
 
-# The AsyncBroker (For Agents)
-
-If testing via an AI agent, or if you need to manually inspect and orchestrate mocked
-responses without LLM timeouts, use the `AsyncBroker`.
-
-	broker := gobo.NewAsyncBroker()
-	mock := gobo.New(gobo.Config{
-		Generator: broker,
-	})
-
-	// ... Meanwhile, in another Go routine or via an Agent MCP Tool:
-	pending := broker.GetPendingRequests()
-	if len(pending) > 0 {
-		broker.SubmitResponse(pending[0].ID, []byte(`{"status": "APPROVED"}`))
+	    http.ListenAndServe(":8080", mux)
 	}
+
+# Safety
+
+Gobo is disabled by default. It only activates when the GOBO=1 environment
+variable is set. Production builds will never get stuck waiting for interception.
+
+# How It Works
+
+When enabled, [Intercept] and [Stub] intercept HTTP requests and route them to
+a [Generator] (by default, an [AsyncBroker] connected to an MCP server on stdio).
+An AI agent connected via MCP can then inspect pending requests and submit
+mock responses.
+
+When disabled, [Intercept] passes through to the real handler and [Stub]
+returns the schema struct as static JSON. Zero overhead.
+
+# Schema Tags
+
+Use the "gobo" struct tag to give field-level instructions to the AI:
+
+	type Payment struct {
+	    TransactionID string `json:"transaction_id" gobo:"A valid UUID v4"`
+	    Status        string `json:"status" gobo:"Must always be 'APPROVED'"`
+	    Amount        int    `json:"amount" gobo:"Amount in cents, between 100 and 99999"`
+	}
+
+# Instance API
+
+For advanced use cases, create your own [Gobo] instance:
+
+	g := gobo.New(gobo.WithOllama("http://localhost:11434", "llama3"))
+	mux.Handle("GET /users", g.Intercept(handler, UserResponse{}))
 */
 package gobo

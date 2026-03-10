@@ -8,6 +8,20 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
+func init() {
+	gobo.RegisterMCPStarter(func(g *gobo.Gobo) {
+		broker := gobo.NewAsyncBroker()
+		g.SetGenerator(broker)
+		srv := NewServer(broker)
+		go func() {
+			log.Println("[gobo-mcp] MCP server starting on stdio")
+			if err := srv.Start(context.Background()); err != nil {
+				log.Printf("[gobo-mcp] MCP server error: %v", err)
+			}
+		}()
+	})
+}
+
 // Server wraps a Gobo AsyncBroker and maps its API into MCP tools.
 type Server struct {
 	broker *gobo.AsyncBroker
